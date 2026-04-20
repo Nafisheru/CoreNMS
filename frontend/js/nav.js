@@ -1,8 +1,21 @@
 // frontend/js/nav.js
 
 function renderNav(currentPage) {
-  const user = api.getUser();
-  if (!user) { window.location.href = '/index.html'; return; }
+  // Global safety: remove preloading after 500ms no matter what
+  setTimeout(() => document.body.classList.remove('preloading'), 500);
+
+  let user = null;
+  try {
+    user = api.getUser();
+  } catch (e) {
+    api.clearAuth();
+  }
+
+  if (!user) { 
+    document.body.classList.remove('preloading');
+    window.location.href = '/index.html'; 
+    return; 
+  }
 
   const menus = [
     { group: 'MONITORING', items: [
@@ -29,6 +42,28 @@ function renderNav(currentPage) {
     activity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`
   };
 
+  applyTheme();
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+
+  // Initialize Sidebar Structure if empty
+  if (!sidebar.innerHTML.trim() || !document.getElementById('sidebar-nav')) {
+    sidebar.innerHTML = `
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" width="20" height="20">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>CoreNMS</h1>
+          <div>Fiber Management</div>
+        </div>
+      </div>
+      <nav id="sidebar-nav" class="sidebar-nav"></nav>
+    `;
+  }
+
   const navEl = document.getElementById('sidebar-nav');
   if (navEl) {
     // Instant Restore from Cache to prevent blank flash
@@ -44,7 +79,10 @@ function renderNav(currentPage) {
 
   let html = '';
   menus.forEach(group => {
-    const visibleItems = group.items.filter(item => item.roles.includes(user.role));
+    const visibleItems = group.items.filter(item => {
+      const userRole = (user.role || '').toLowerCase();
+      return item.roles.includes(userRole);
+    });
     if (visibleItems.length === 0) return;
     
     html += `<div class="sidebar-section-label">${group.group}</div>`;
@@ -60,7 +98,6 @@ function renderNav(currentPage) {
   }
 
   // Footer Cache/Injection
-  const sidebar = document.querySelector('.sidebar');
   if (sidebar && !document.getElementById('sidebar-footer')) {
     const footerHtml = `
       <div class="user-info">
@@ -69,15 +106,15 @@ function renderNav(currentPage) {
           <div class="name">${user.full_name || user.username}</div>
           <div class="role">${user.role}</div>
         </div>
-      </div>
-      <div class="footer-actions">
-        <button id="btn-theme" class="btn-icon-sm" title="Toggle Theme">
-          <span class="theme-icon-sun" style="display:none">${svgs.sun}</span>
-          <span class="theme-icon-moon">${svgs.moon}</span>
-        </button>
-        <button id="btn-logout" class="btn-icon-sm danger" title="Keluar">
-          ${svgs.logout}
-        </button>
+        <div class="footer-actions">
+          <button id="btn-theme" class="btn-icon-sm" title="Toggle Theme">
+            <span class="theme-icon-sun" style="display:none">${svgs.sun}</span>
+            <span class="theme-icon-moon">${svgs.moon}</span>
+          </button>
+          <button id="btn-logout" class="btn-icon-sm danger" title="Keluar">
+            ${svgs.logout}
+          </button>
+        </div>
       </div>
     `;
 

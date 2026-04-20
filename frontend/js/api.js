@@ -40,8 +40,12 @@ const api = {
   },
 
   getUser() {
-    const user = localStorage.getItem('core_user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem('core_user');
+      return user ? JSON.parse(user) : null;
+    } catch (e) {
+      return null;
+    }
   },
 
   getToken() {

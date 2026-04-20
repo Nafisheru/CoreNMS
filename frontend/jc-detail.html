@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JC Detail - CoreNMS</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    @keyframes corePulse {
+      0% { transform: scale(1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+      50% { transform: scale(1.1); box-shadow: 0 0 20px var(--accent); }
+      100% { transform: scale(1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    }
+    .core-node.selected {
+      animation: corePulse 1.5s infinite;
+      border-color: var(--text-primary) !important;
+      z-index: 10;
+    }
+    .toast-container {
+      position: fixed; top: 24px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      background: var(--bg-card); border-left: 4px solid var(--accent);
+      padding: 12px 20px; border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      color: var(--text-primary); font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 12px;
+      animation: slideIn 0.3s ease-out;
+      border: 1px solid var(--border-color);
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="toast-container" id="toast-container"></div>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div style="display:flex; align-items:center; gap:16px">
+        <button class="btn btn-ghost" onclick="location.href='joint-closure.html'" style="padding:8px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <h2 id="jc-header-title" style="font-family:var(--font-premium); font-weight:800; margin-bottom:4px">Loading...</h2>
+          <div id="jc-header-subtitle" style="font-size:12px; color:var(--text-muted); display:flex; gap:16px"></div>
+        </div>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-ghost" onclick="loadJCData()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div style="display:grid; grid-template-columns: 350px 1fr; gap:24px; align-items: start">
+        
+        <!-- Left Column: JC Cables & Info -->
+        <div style="display:flex; flex-direction:column; gap:24px">
+          
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+              <h4 style="font-size:12px; text-transform:uppercase; letter-spacing:1px">Kabel Terpasang</h4>
+              <button class="btn btn-primary" style="padding:6px 12px; font-size:11px" onclick="openCableModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 5v14M5 12h14"/></svg>
+                Tambah
+              </button>
+            </div>
+            <div id="cable-list" style="display:flex; flex-direction:column; gap:12px">
+              <!-- Cables will go here -->
+              <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px">Belum ada kabel terpilih</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4 style="font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:16px">Ringkasan</h4>
+            <div id="jc-summary" style="display:grid; gap:12px">
+               <!-- Summary stats -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Trays & Splicing -->
+        <div class="card" style="padding:0">
+          <div style="padding:20px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center">
+            <h4 style="font-size:13px; font-weight:700">Manajemen Tray & Splicing</h4>
+            <button class="btn btn-primary" onclick="addTray()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+              Tambah Tray
+            </button>
+          </div>
+          <div id="tray-container" style="padding:24px; display:grid; gap:20px">
+            <!-- Trays will go here -->
+            <div style="text-align:center; padding:60px 20px; color:var(--text-muted)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px; opacity:0.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <p>Belum ada Tray di Joint Closure ini.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Hubungkan Kabel -->
+  <div class="modal-overlay" id="modal-cable">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Connect Cable to JC</h3>
+        <button class="btn-close" onclick="closeModal('modal-cable')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="form-connect-cable" onsubmit="saveCableRelation(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Pilih Kabel dari Master</label>
+            <div class="input-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+              <select id="master-cable-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px">
+            <div class="form-group">
+              <label class="form-label">Posisi Kabel</label>
+              <select id="cable-side" class="form-control">
+                <option value="SISI A">SISI A</option>
+                <option value="SISI B">SISI B</option>
+                <option value="IN">IN</option>
+                <option value="OUT">OUT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Arah Kabel</label>
+              <input type="text" id="cable-direction" class="form-control" placeholder="Contoh: Ke ODP-A">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-cable')">Batal</button>
+          <button type="submit" class="btn btn-primary">Hubungkan Kabel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Tambah Tray -->
+  <div class="modal-overlay" id="modal-tray">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <h3>Tambah Tray Baru</h3>
+        <button class="btn-close" onclick="closeModal('modal-tray')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="form-add-tray" onsubmit="saveTray(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nomor Tray</label>
+            <select id="tray-number" class="form-control" required>
+              <option value="1">Tray 1</option>
+              <option value="2">Tray 2</option>
+              <option value="3">Tray 3</option>
+              <option value="4">Tray 4</option>
+              <option value="5">Tray 5</option>
+              <option value="6">Tray 6</option>
+              <option value="7">Tray 7</option>
+              <option value="8">Tray 8</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kapasitas (Core)</label>
+            <select id="tray-capacity" class="form-control">
+              <option value="12">12 Core</option>
+              <option value="24" selected>24 Core</option>
+              <option value="48">48 Core</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-tray')">Batal</button>
+          <button type="submit" class="btn btn-primary">Tambah Tray</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Splicing Management (Redesigned & Compact) -->
+  <div class="modal-overlay" id="modal-splicing" style="display:none; justify-content:center; align-items:center">
+    <div class="modal" style="width:90%; max-width:1100px; height:85vh; border-radius:16px; display:flex; flex-direction:column; background:#f8fafc; overflow:hidden; box-shadow:0 24px 48px rgba(0,0,0,0.3)">
+      <div class="modal-header" style="border-radius:0; padding:16px 32px; background:#fff; border-bottom:1px solid #e2e8f0">
+        <div style="display:flex; align-items:center; gap:20px">
+          <div style="background:var(--accent); width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <h3 id="splicing-title" style="margin:0; font-size:15px; font-weight:800; color:#1e293b">Splicing Workspace</h3>
+            <p id="splicing-stats" style="font-size:10px; color:#64748b; margin:0"></p>
+          </div>
+        </div>
+        <button class="btn-close" onclick="closeModal('modal-splicing')" style="background:#f1f5f9; border-radius:50%; width:32px; height:32px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      
+      <div style="display:grid; grid-template-columns: 320px 1fr 320px; flex:1; overflow:hidden; position:relative; background:#fff" id="splicing-container">
+        
+        <!-- SVG Overlay for lines (Move to root of container to cover all 3 panes) -->
+        <svg id="splice-lines-svg" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:99">
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter>
+          </defs>
+        </svg>
+
+        <!-- Left: Source Panel -->
+        <div style="display:flex; flex-direction:column; border-right:1px solid #f1f5f9">
+           <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #f1f5f9">
+              <label style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase; margin-bottom:4px; display:block">INPUT (ORIGIN)</label>
+              <select id="splice-source-select" class="form-control" style="height:32px; font-size:12px; font-weight:600; padding:0 8px" onchange="renderSourceCores()"></select>
+           </div>
+           <div id="splice-source-list" style="flex:1; overflow-y:auto; padding-bottom:40px"></div>
+        </div>
+
+        <!-- Middle: Visualization -->
+        <div style="position:relative; background:#fcfcfd">
+           <div style="padding:16px; text-align:center; color:#cbd5e1; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:2px">Splice Map</div>
+        </div>
+
+        <!-- Right: Target Panel -->
+        <div style="display:flex; flex-direction:column; border-left:1px solid #f1f5f9">
+           <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #f1f5f9">
+              <label style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase; margin-bottom:4px; display:block">OUTPUT (TARGET)</label>
+              <select id="splice-target-select" class="form-control" style="height:32px; font-size:12px; font-weight:600; padding:0 8px" onchange="renderTargetCores()"></select>
+           </div>
+           <div id="splice-target-list" style="flex:1; overflow-y:auto; padding-bottom:40px"></div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding:16px 32px; background:#fff; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between">
+        <div style="display:flex; gap:16px">
+           <div style="display:flex; align-items:center; gap:6px; font-size:10px; color:#64748b; font-weight:600">
+              <div style="width:10px; height:10px; background:#10b981; border-radius:50%"></div> Connected
+           </div>
+           <div style="display:flex; align-items:center; gap:6px; font-size:10px; color:#64748b; font-weight:600">
+              <div style="width:10px; height:10px; background:#f1f5f9; border-radius:1px; border:1px solid #e2e8f0"></div> Free
+           </div>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="closeModal('modal-splicing')" style="padding:8px 32px; border-radius:8px">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirmation Modal -->
+  <div id="modal-confirm" class="modal-overlay" style="display:none; justify-content:center; align-items:center; z-index:9999; backdrop-filter:blur(4px)">
+     <div class="modal" style="width:400px; padding:32px; text-align:center; border-radius:24px; box-shadow:0 20px 50px rgba(0,0,0,0.2)">
+        <div style="width:64px; height:64px; background:#fee2e2; color:#ef4444; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="32" height="32"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h4 style="margin:0 0 8px; font-size:18px; font-weight:800; color:#1e293b">Konfirmasi</h4>
+        <p id="confirm-message" style="margin:0 0 24px; font-size:13px; color:#64748b; line-height:1.6"></p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px">
+           <button class="btn btn-secondary" onclick="closeConfirm(false)" style="padding:12px; border-radius:12px; font-weight:700">Batal</button>
+           <button class="btn btn-danger" onclick="closeConfirm(true)" style="padding:12px; border-radius:12px; font-weight:700">Ya, Hapus</button>
+        </div>
+     </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script>
+    renderNav('joint-closure.html');
+    const urlParams = new URLSearchParams(window.location.search);
+    const jcId = urlParams.get('id');
+
+    // Global Confirmation Helper
+    let confirmCallback = null;
+    function showConfirm(message, callback) {
+      document.getElementById('confirm-message').textContent = message;
+      document.getElementById('modal-confirm').style.display = 'flex';
+      confirmCallback = callback;
+    }
+    function closeConfirm(result) {
+      document.getElementById('modal-confirm').style.display = 'none';
+      if (confirmCallback) confirmCallback(result);
+    }
+
+    if (!jcId) {
+      alert('ID Joint Closure tidak valid');
+      location.href = 'joint-closure.html';
+    }
+
+    async function loadJCData() {
+      try {
+        const jc = await api.get(`/joint-closure/${jcId}`);
+        
+        // Header
+        document.getElementById('jc-header-title').textContent = jc.kode_jc;
+        document.getElementById('jc-header-subtitle').innerHTML = `
+          <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:-2px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${jc.koordinat || 'No Coords'}</span>
+          <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:-2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/><path d="M12 8v4l2 2"/></svg> ${new Date(jc.created_at).toLocaleDateString()}</span>
+        `;
+
+        // Cables
+        const cableList = document.getElementById('cable-list');
+        if (jc.cables && jc.cables.length > 0) {
+          cableList.innerHTML = jc.cables.map(c => `
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center">
+              <div>
+                <div style="font-size:13px; font-weight:700">${c.nama_kabel}</div>
+                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-top:2px">${c.sisi_kabel} • ${c.arah_kabel || 'Tanpa Arah'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px; font-weight:700; color:var(--accent)">${c.total_core} CORE</div>
+                <button class="btn btn-ghost" style="padding:4px; border:none; color:var(--danger); margin-top:4px" onclick="disconnectCable(${c.id})">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          cableList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px">Belum ada kabel terpilih</div>';
+        }
+
+        // Trays
+        renderTrays(jc.trays);
+
+        // Summary Statistics
+        const summary = document.getElementById('jc-summary');
+        summary.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--text-muted)">Total Kabel:</span>
+            <span style="font-weight:700">${jc.cables?.length || 0}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--text-muted)">Total Tray:</span>
+            <span style="font-weight:700">${jc.trays?.length || 0}</span>
+          </div>
+        `;
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderTrays(trays) {
+      const container = document.getElementById('tray-container');
+      if (!trays || trays.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:60px 20px; color:var(--text-muted)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px; opacity:0.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <p>Belum ada Tray di Joint Closure ini.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = trays.map(t => `
+        <div class="card" style="padding:16px; border-color:rgba(67, 97, 238, 0.2); background:rgba(67, 97, 238, 0.02)">
+          <div style="display:flex; justify-content:space-between; align-items:center">
+            <div>
+              <div style="font-size:14px; font-weight:800; color:var(--text-primary)">TRAY #${t.nomor_tray}</div>
+              <div style="font-size:11px; color:var(--text-muted)">Kapasitas: ${t.kapasitas_tray} Core</div>
+            </div>
+            <div style="display:flex; gap:12px">
+              <button class="btn btn-primary" style="padding:6px 12px; font-size:11px" onclick="openSplicing(${t.id})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Splicing
+              </button>
+              <button class="btn btn-ghost" style="padding:6px; border:none; color:var(--accent)" onclick="editTray(${JSON.stringify(t).replace(/"/g, '&quot;')})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="btn btn-ghost" style="padding:6px; border:none; color:var(--danger)" onclick="deleteTray(${t.id})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Modal logic
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    async function openCableModal() {
+      try {
+        const masterCables = await api.get('/kabel');
+        const select = document.getElementById('master-cable-select');
+        select.innerHTML = '<option value="">-- Pilih Kabel --</option>' + 
+          masterCables.map(c => `<option value="${c.id}">${c.nama_kabel} (${c.total_core} C / ${c.jenis_kabel})</option>`).join('');
+        document.getElementById('modal-cable').style.display = 'flex';
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // TRAY LOGIC
+    let editingTrayId = null;
+
+    function addTray() {
+      editingTrayId = null;
+      document.querySelector('#modal-tray h3').textContent = 'Tambah Tray Baru';
+      document.getElementById('form-add-tray').reset();
+      document.getElementById('modal-tray').style.display = 'flex';
+    }
+
+    function editTray(tray) {
+      editingTrayId = tray.id;
+      document.querySelector('#modal-tray h3').textContent = 'Edit Tray #' + tray.nomor_tray;
+      document.getElementById('tray-number').value = tray.nomor_tray;
+      document.getElementById('tray-capacity').value = tray.kapasitas_tray;
+      document.getElementById('modal-tray').style.display = 'flex';
+    }
+
+    async function saveTray(e) {
+      e.preventDefault();
+      const data = {
+        jc_id: parseInt(jcId),
+        nomor_tray: parseInt(document.getElementById('tray-number').value),
+        kapasitas_tray: parseInt(document.getElementById('tray-capacity').value)
+      };
+
+      try {
+        if (editingTrayId) {
+          await api.put(`/joint-closure/trays/${editingTrayId}`, data);
+        } else {
+          await api.post('/joint-closure/trays', data);
+        }
+        closeModal('modal-tray');
+        loadJCData();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteTray(id) {
+      if (!confirm('Hapus Tray ini? Semua data penyambungan di dalamnya akan hilang.')) return;
+      try {
+        await api.delete(`/joint-closure/trays/${id}`);
+        loadJCData();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // SPLICING LOGIC
+    let currentJcData = null;
+    const coreColors = ['#1e88e5', '#ff9800', '#4caf50', '#795548', '#9e9e9e', '#ffffff', '#f44336', '#212121', '#ffeb3b', '#9c27b0', '#e91e63', '#00bcd4'];
+
+    async function openSplicing(trayId) {
+      try {
+        const jc = await api.get(`/joint-closure/${jcId}`);
+        currentJcData = jc;
+        const tray = jc.trays.find(t => t.id === trayId);
+        
+        document.getElementById('splicing-title').textContent = `Splicing Workspace - Tray #${tray?.nomor_tray || '?'}`;
+        document.getElementById('splicing-stats').textContent = `${jc.cables?.length || 0} Kabel Terhubung`;
+
+        // Load existing splices for this tray from DB
+        try {
+          const splices = await api.get(`/joint-closure/trays/${trayId}/splices`);
+          trayConnections = splices.map(s => ({
+             id: s.id,
+             sourceCableId: s.source_kabel_id,
+             sourceCore: s.source_core,
+             targetCableId: s.target_kabel_id,
+             targetCore: s.target_core
+          }));
+        } catch (e) {
+          trayConnections = []; // Fallback if no splices or table not ready
+        }
+
+        const sourceSelect = document.getElementById('splice-source-select');
+        const targetSelect = document.getElementById('splice-target-select');
+
+        const cableOptions = jc.cables.map(c => `<option value="${c.id}">${c.nama_kabel} (${c.sisi_kabel || ''})</option>`).join('');
+        sourceSelect.innerHTML = cableOptions;
+        targetSelect.innerHTML = cableOptions;
+
+        // Forced Smart Select: Side A/IN to Source, Side B/OUT to Target
+        let sIdx = 0, tIdx = jc.cables.length > 1 ? 1 : 0;
+        
+        jc.cables.forEach((c, i) => {
+          const side = (c.sisi_kabel || '').toUpperCase();
+          if (side.includes('A') || side.includes('IN')) sIdx = i;
+          if (side.includes('B') || side.includes('OUT')) tIdx = i;
+        });
+
+        if (sourceSelect.options.length > 0) sourceSelect.selectedIndex = sIdx;
+        if (targetSelect.options.length > 0) targetSelect.selectedIndex = tIdx;
+
+        renderSourceCores();
+        renderTargetCores();
+
+        document.getElementById('modal-splicing').style.display = 'flex';
+        setTimeout(drawConnections, 400); 
+      } catch (err) {
+        toast(err.message, 'danger');
+      }
+    }
+
+    const colorNames = ['BIRU', 'ORANYE', 'HIJAU', 'COKELAT', 'ABU-ABU', 'PUTIH', 'MERAH', 'HITAM', 'KUNING', 'UNGU', 'PINK', 'TOSKA'];
+
+    function isCoreConnected(cableId, coreNum) {
+      return trayConnections.some(conn => 
+        (conn.sourceCableId == cableId && conn.sourceCore == coreNum) || 
+        (conn.targetCableId == cableId && conn.targetCore == coreNum)
+      );
+    }
+
+    function selectCore(el) {
+       const isSource = el.closest('#splice-source-list');
+       const cableId = el.dataset.cable;
+       const coreNum = el.dataset.core;
+
+       // Logic: Check if already connected
+       if (isCoreConnected(cableId, coreNum)) {
+         toast(`Core #${coreNum} sudah memiliki sambungan!`, 'danger');
+         return;
+       }
+       
+       if (isSource) {
+         document.querySelectorAll('#splice-source-list .core-row').forEach(n => {
+           n.style.borderLeft = 'none';
+           n.style.background = 'white';
+         });
+         el.style.borderLeft = '4px solid var(--accent)';
+         el.style.background = 'rgba(67, 97, 238, 0.05)';
+         selectedSource = { cableId, coreNum };
+         toast(`Asal terpilih: #${coreNum}`, 'success');
+       } else {
+         if (!selectedSource) {
+           toast('Pilih core asal (INPUT) terlebih dahulu', 'danger');
+           return;
+         }
+         
+         saveSplice(selectedSource, { cableId, coreNum });
+         selectedSource = null;
+         document.querySelectorAll('.core-row').forEach(n => {
+           n.style.borderLeft = 'none';
+           n.style.background = 'white';
+         });
+       }
+    }
+
+    function buildTubeHtml(cableId, totalCores, totalTubes) {
+      const actualTubes = parseInt(totalTubes) || (totalCores <= 12 ? 1 : Math.ceil(totalCores / 12));
+      const coresPerTube = Math.floor(totalCores / actualTubes);
+      let tubesHtml = '';
+      
+      for (let t = 0; t < actualTubes; t++) {
+        const startCore = t * coresPerTube;
+        const coresInThisTube = (t === actualTubes - 1) ? (totalCores - startCore) : coresPerTube;
+        if (coresInThisTube <= 0) continue;
+        
+        tubesHtml += `
+          <div style="background:#f8fafc; padding:8px 20px; font-size:9px; font-weight:800; color:#64748b; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; position:sticky; top:0; z-index:2">
+            TUBE #${t+1}
+            <span>${coresInThisTube} CORES</span>
+          </div>
+          <div style="display:flex; flex-direction:column">
+            ${Array.from({length: coresInThisTube}).map((_, i) => {
+              const coreNum = startCore + i + 1;
+              const colorIdx = (coreNum - 1) % 12;
+              const color = coreColors[colorIdx];
+              const colorName = colorNames[colorIdx];
+              const connected = isCoreConnected(cableId, coreNum);
+              
+              return `
+                <div class="core-row" data-cable="${cableId}" data-core="${coreNum}" onclick="handleCoreClick(event, this)"
+                     style="display:flex; align-items:center; padding:8px 20px; border-bottom:1px solid #f8fafc; cursor:pointer; gap:12px; transition:all 0.2s" 
+                     onmouseover="this.style.background='#fcfdfe'" onmouseout="this.style.background='white'">
+                  <div style="width:20px; height:20px; background:${color}; border-radius:4px; display:flex; align-items:center; justify-content:center; color:${['#ffffff','#ffeb3b','#00bcd4','#9e9e9e'].includes(color) ? '#000' : '#fff'}; font-size:9px; font-weight:800; box-shadow:0 1px 2px rgba(0,0,0,0.1)">
+                    ${coreNum}
+                  </div>
+                  <div style="flex:1">
+                    <div style="font-size:10.5px; font-weight:700; color:#334155">${colorName}</div>
+                    <div style="font-size:8.5px; color:#94a3b8; text-transform:uppercase">CORE ${coreNum}</div>
+                  </div>
+                  ${connected ? `
+                    <button onclick="disconnectCore(event, '${cableId}', ${coreNum})" style="background:#fee2e2; border:none; padding:4px; border-radius:4px; color:#ef4444; display:flex; align-items:center; cursor:pointer" title="Hapus Sambungan">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  ` : `
+                    <div class="status-badge" style="font-size:7.5px; font-weight:800; padding:3px 6px; border-radius:4px; background:#f1f5f9; color:#64748b">FREE</div>
+                  `}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+      return tubesHtml;
+    }
+
+    function handleCoreClick(e, el) {
+       // Ignore if clicked on disconnect button
+       if (e.target.closest('button')) return;
+       selectCore(el);
+    }
+
+    async function saveSplice(source, target) {
+       const data = {
+         tray_id: currentTrayId,
+         source_kabel_id: parseInt(source.cableId),
+         source_core: parseInt(source.coreNum),
+         target_kabel_id: parseInt(target.cableId),
+         target_core: parseInt(target.coreNum)
+       };
+
+       try {
+         const res = await api.post('/joint-closure/splices', data);
+         trayConnections.push({
+           id: res.id,
+           sourceCableId: source.cableId,
+           sourceCore: source.coreNum,
+           targetCableId: target.cableId,
+           targetCore: target.coreNum
+         });
+         renderSourceCores();
+         renderTargetCores();
+         drawConnections();
+         toast('Sambungan disimpan');
+       } catch (err) {
+         toast(err.message, 'danger');
+       }
+    }
+
+    async function disconnectCore(e, cableId, coreNum) {
+       e.stopPropagation();
+       const conn = trayConnections.find(c => 
+         (c.sourceCableId == cableId && c.sourceCore == coreNum) || 
+         (c.targetCableId == cableId && c.targetCore == coreNum)
+       );
+       
+       if (!conn) return;
+       
+       showConfirm(`Hapus sambungan pada Core #${coreNum}?`, async (ok) => {
+         if (!ok) return;
+         try {
+           await api.delete(`/joint-closure/splices/${conn.id}`);
+           trayConnections = trayConnections.filter(c => c.id !== conn.id);
+           renderSourceCores();
+           renderTargetCores();
+           drawConnections();
+           toast('Sambungan dihapus', 'success');
+         } catch (err) {
+           toast(err.message, 'danger');
+         }
+       });
+    }
+
+    function renderSourceCores() {
+      const cableId = document.getElementById('splice-source-select').value;
+      const cable = currentJcData.cables.find(c => c.id == cableId);
+      if (cable) {
+        document.getElementById('splice-source-list').innerHTML = buildTubeHtml(cableId, cable.total_core, cable.total_tube);
+      }
+    }
+
+    function renderTargetCores() {
+      const cableId = document.getElementById('splice-target-select').value;
+      const cable = currentJcData.cables.find(c => c.id == cableId);
+      if (cable) {
+        document.getElementById('splice-target-list').innerHTML = buildTubeHtml(cableId, cable.total_core, cable.total_tube);
+      }
+    }
+
+    function toast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast';
+      if (type === 'danger') t.style.borderLeftColor = 'var(--danger)';
+      t.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="${type === 'success' ? 'M22 11.08V12a10 10 0 1 1-5.93-9.14' : 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'}"/>
+          ${type === 'success' ? '<polyline points="22 4 12 14.01 9 11.01"/>' : ''}
+        </svg>
+        ${message}
+      `;
+      container.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    let selectedSource = null;
+    let trayConnections = [];
+
+    function isCoreConnected(cableId, coreNum) {
+      return trayConnections.find(conn => 
+        (conn.sourceCableId == cableId && conn.sourceCore == coreNum) || 
+        (conn.targetCableId == cableId && conn.targetCore == coreNum)
+      );
+    }
+
+    function drawConnections() {
+      const svg = document.getElementById('splice-lines-svg');
+      const container = document.getElementById('splicing-container');
+      if (!container || !svg) return;
+      const cR = container.getBoundingClientRect();
+      const defs = svg.querySelector('defs');
+      svg.innerHTML = '';
+      if (defs) svg.appendChild(defs);
+
+      trayConnections.forEach(conn => {
+        const sN = document.querySelector(`#splice-source-list .core-row[data-cable="${conn.sourceCableId}"][data-core="${conn.sourceCore}"]`);
+        const tN = document.querySelector(`#splice-target-list .core-row[data-cable="${conn.targetCableId}"][data-core="${conn.targetCore}"]`);
+        if (sN && tN) {
+          const sR = sN.getBoundingClientRect();
+          const tR = tN.getBoundingClientRect();
+          const x1 = sR.right - cR.left, y1 = sR.top + sR.height/2 - cR.top;
+          const x2 = tR.left - cR.left, y2 = tR.top + tR.height/2 - cR.top;
+          const sC = document.getElementById('splice-source-list').getBoundingClientRect();
+          const tC = document.getElementById('splice-target-list').getBoundingClientRect();
+          if (sR.bottom < sC.top || sR.top > sC.bottom || tR.bottom < tC.top || tR.top > tC.bottom) return;
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const cpX = x1 + (x2 - x1) / 2;
+          path.setAttribute('d', `M ${x1} ${y1} C ${cpX} ${y1}, ${cpX} ${y2}, ${x2} ${y2}`);
+          path.setAttribute('stroke', '#6366f1'); path.setAttribute('stroke-width', '2');
+          path.setAttribute('fill', 'none'); path.setAttribute('stroke-dasharray', '6,4');
+          const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+          anim.setAttribute('attributeName', 'stroke-dashoffset');
+          anim.setAttribute('from', '40'); anim.setAttribute('to', '0');
+          anim.setAttribute('dur', '2s'); anim.setAttribute('repeatCount', 'indefinite');
+          path.appendChild(anim);
+          svg.appendChild(path);
+        }
+      });
+    }
+
+    function selectCore(el) {
+       const isSource = el.closest('#splice-source-list');
+       if (isCoreConnected(el.dataset.cable, el.dataset.core)) {
+         toast(`Core #${el.dataset.core} terhubung!`, 'danger'); return;
+       }
+       if (isSource) {
+         document.querySelectorAll('#splice-source-list .core-row').forEach(n => n.style.borderLeft = 'none');
+         el.style.borderLeft = '4px solid var(--accent)';
+         selectedSource = { cableId: el.dataset.cable, coreNum: el.dataset.core };
+       } else if (selectedSource) {
+         trayConnections.push({
+           sourceCableId: selectedSource.cableId, sourceCore: selectedSource.coreNum,
+           targetCableId: el.dataset.cable, targetCore: el.dataset.core
+         });
+         selectedSource = null;
+         document.querySelectorAll('.core-row').forEach(n => n.style.borderLeft = 'none');
+         renderSourceCores(); renderTargetCores(); drawConnections();
+       }
+    }
+
+    document.getElementById('splice-source-list').onscroll = drawConnections;
+    document.getElementById('splice-target-list').onscroll = drawConnections;
+
+    async function disconnectCable(relationId) {
+      showConfirm('Putuskan koneksi kabel ini dari JC?', async (ok) => {
+        if (!ok) return;
+        try {
+          await api.delete(`/joint-closure/disconnect-cable/${relationId}`);
+          loadJCData();
+          toast('Kabel dilepas');
+        } catch (err) {
+          toast(err.message, 'danger');
+        }
+      });
+    }
+
+    async function saveCableRelation(e) {
+      e.preventDefault();
+      const data = {
+        jc_id: parseInt(jcId),
+        kabel_id: parseInt(document.getElementById('master-cable-select').value),
+        sisi_kabel: document.getElementById('cable-side').value,
+        arah_kabel: document.getElementById('cable-direction').value
+      };
+
+      try {
+        await api.post('/joint-closure/connect-cable', data);
+        closeModal('modal-cable');
+        loadJCData();
+        toast('Kabel ditambahkan');
+      } catch (err) {
+        toast(err.message, 'danger');
+      }
+    }
+
+    // Initialize
+    loadJCData();
+  </script>
+</body>
+</html>

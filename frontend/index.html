@@ -43,7 +43,7 @@
     }
   </style>
 </head>
-<body class="preloading">
+<body>
 
 <div class="login-container">
   <div class="logo-large">
@@ -79,6 +79,10 @@
 
 <script src="/js/api.js"></script>
 <script>
+  window.onload = () => {
+    setTimeout(() => document.body.classList.remove('preloading'), 50);
+  };
+
   if (api.getToken()) window.location.href = '/dashboard.html';
 
   document.getElementById('login-form').onsubmit = async (e) => {

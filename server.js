@@ -26,8 +26,8 @@ app.use('/api/joint-closure', jcRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// SPA fallback
-app.get(/^\/(?!api).*/, (req, res) => {
+// Default index.html for root
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/index.html'));
 });
 
