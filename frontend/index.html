@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoreNMS - Portal Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function() {
+      const t = localStorage.getItem('core_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.style.background = (t === 'dark' ? '#0a0e1a' : '#f4f7fe');
+    })();
+  </script>
+  <style>
+    body {
+      background: radial-gradient(circle at top right, var(--bg-secondary), var(--bg-primary));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-container {
+      width: 100%; max-width: 400px;
+      padding: 40px;
+      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } }
+    .logo-large {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, var(--accent), #7c4dff);
+      border-radius: 16px;
+      margin: 0 auto 24px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 10px 20px var(--accent-glow);
+    }
+    .error-msg {
+      background: var(--danger-bg);
+      color: var(--danger);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="preloading">
+
+<div class="login-container">
+  <div class="logo-large">
+    <svg viewBox="0 0 24 24" style="width:32px; height:32px; fill:white"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6"/><path d="M1 12l5.5 5.5L12 12l5.5 5.5L23 12"/></svg>
+  </div>
+  
+  <div class="card" style="padding: 40px;">
+    <h2 style="text-align:center; font-family:var(--font-premium); font-size:24px; margin-bottom:8px">Selamat Datang</h2>
+    <p style="text-align:center; color:var(--text-muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:32px">CoreNMS Unified Portal</p>
+    
+    <div id="error-msg" class="error-msg"></div>
+    
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" id="username" class="form-control" placeholder="Masukkan username" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+      </div>
+      
+      <button type="submit" class="btn btn-primary" style="width:100%; height:48px; justify-content:center; margin-top:12px">
+        Masuk ke Dashboard
+      </button>
+    </form>
+  </div>
+  
+  <p style="text-align:center; margin-top:24px; color:var(--text-muted); font-size:12px">
+    &copy; 2024 CoreNMS Stage 1. All rights reserved.
+  </p>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  if (api.getToken()) window.location.href = '/dashboard.html';
+
+  document.getElementById('login-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('error-msg');
+    const btn = e.target.querySelector('button');
+    
+    errorEl.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+    
+    try {
+      const resp = await api.post('/auth/login', {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+      });
+      api.setAuth(resp.token, resp.user);
+      window.location.href = '/dashboard.html';
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Masuk ke Dashboard';
+    }
+  };
+</script>
+
+</body>
+</html>

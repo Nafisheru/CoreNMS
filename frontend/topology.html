@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Topology Map - CoreNMS</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function() {
+      const t = localStorage.getItem('core_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.style.background = (t === 'dark' ? '#0a0e1a' : '#f4f7fe');
+    })();
+  </script>
+</head>
+<body class="preloading">
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" style="width:22px; height:22px; fill:white"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6"/><path d="M1 12l5.5 5.5L12 12l5.5 5.5L23 12"/></svg>
+      </div>
+      <div class="logo-text">
+        <h1>CoreNMS</h1>
+        <div>Unified Portal</div>
+      </div>
+    </div>
+    <nav id="sidebar-nav"></nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <h2 style="font-family:var(--font-premium); font-weight:800">Topology Map</h2>
+        <p style="font-size:12px; color:var(--text-muted)">Visual representation of your network structure</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+          Recenter Map
+        </button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="card" style="height:calc(100vh - 180px); display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); overflow:hidden; position:relative">
+        <div style="position:absolute; inset:0; background-image:radial-gradient(var(--border-color) 1px, transparent 1px); background-size:32px 32px; opacity:0.3"></div>
+        <div style="text-align:center; position:relative; z-index:10">
+          <div class="logo-icon" style="width:80px; height:80px; margin:0 auto 24px; opacity:0.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="7" y1="16" x2="10" y2="8"/><line x1="17" y1="16" x2="14" y2="8"/></svg>
+          </div>
+          <h3 style="font-family:var(--font-premium); color:var(--text-primary); margin-bottom:12px; font-size:20px">Map Under Construction</h3>
+          <p style="max-width:400px; color:var(--text-secondary)">We are building a powerful fiber-optic topology visualizer. This feature will be available in Stage 2 of development.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  renderNav('topology.html');
+</script>
+</body>
+</html>

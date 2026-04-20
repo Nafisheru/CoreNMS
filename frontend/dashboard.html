@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - CoreNMS</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function() {
+      const t = localStorage.getItem('core_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.style.background = (t === 'dark' ? '#0a0e1a' : '#f4f7fe');
+    })();
+  </script>
+  <style>
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .stat-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .stat-val { font-size: 24px; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+  </style>
+</head>
+<body class="preloading">
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" style="width:22px; height:22px; fill:white"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6"/><path d="M1 12l5.5 5.5L12 12l5.5 5.5L23 12"/></svg>
+      </div>
+      <div class="logo-text">
+        <h1>CoreNMS</h1>
+        <div>Unified Portal</div>
+      </div>
+    </div>
+    <nav id="sidebar-nav"></nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <h2 style="font-family:var(--font-premium); font-weight:800">Dashboard Overview</h2>
+        <p style="font-size:12px; color:var(--text-muted)">Welcome back, control your network with ease</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Report
+        </button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="stat-grid">
+        <div class="card stat-card">
+          <div class="stat-icon accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div class="stat-val" id="total-users">-</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+        </div>
+        
+        <div class="card stat-card">
+          <div class="stat-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div class="stat-val">Active</div>
+            <div class="stat-label">System Status</div>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon yellow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <div class="stat-val" id="uptime">99.9%</div>
+            <div class="stat-label">Uptime</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+          <h3 style="font-family:var(--font-premium); font-size:16px">Pesan Selamat Datang</h3>
+          <span class="badge badge-success">Baru</span>
+        </div>
+        <p style="color:var(--text-secondary)">Selamat datang di CoreNMS Stage 1. Ini adalah portal manajemen jaringan terpusat Anda. Di tahap ini, Anda dapat mengelola pengguna dan memantau status sistem dasar. Fitur lainnya akan segera hadir.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  renderNav('dashboard.html');
+
+  async function loadStats() {
+    try {
+      const users = await api.get('/users');
+      document.getElementById('total-users').textContent = users.length;
+    } catch {}
+  }
+  loadStats();
+</script>
+</body>
+</html>
