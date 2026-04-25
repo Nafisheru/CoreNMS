@@ -5,100 +5,195 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - CoreNMS</title>
   <link rel="stylesheet" href="/css/style.css">
-  <script>
-    (function() {
-      const t = localStorage.getItem('core_theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', t);
-      document.documentElement.style.background = (t === 'dark' ? '#0a0e1a' : '#f4f7fe');
-    })();
-  </script>
+  <script>(function(){const t=localStorage.getItem('core_theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.background=(t==='dark'?'#0d0f18':'#f8fafc');})();</script>
   <style>
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 24px;
-      margin-bottom: 32px;
+    /* ── Dashboard Styles ── */
+    .dash-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:16px; }
+    @media(max-width:1200px){.dash-grid{grid-template-columns:repeat(3,1fr);}}
+    @media(max-width:700px){.dash-grid{grid-template-columns:repeat(2,1fr);}}
+
+    .kpi-card {
+      background:var(--bg-card); border:1px solid var(--border-color);
+      border-radius:12px; padding:14px 16px;
+      display:flex; flex-direction:column; gap:8px;
+      position:relative; overflow:hidden;
+      transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+      cursor:default;
     }
-    .stat-card {
-      display: flex; align-items: center; gap: 20px;
+    .kpi-card::after {
+      content:''; position:absolute; top:0; right:0;
+      width:80px; height:80px; border-radius:50%;
+      background:radial-gradient(circle, var(--kpi-color,var(--accent)) 0%, transparent 70%);
+      opacity:.07; transform:translate(35%,-35%);
     }
-    .stat-icon {
-      width: 56px; height: 56px; border-radius: 16px;
-      display: flex; align-items: center; justify-content: center;
+    .kpi-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.4); border-color:var(--kpi-color,var(--accent)); }
+    .kpi-top { display:flex; align-items:center; justify-content:space-between; }
+    .kpi-icon {
+      width:32px; height:32px; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(255,255,255,.05); color:var(--kpi-color,var(--accent));
+      border:1px solid rgba(255,255,255,.07);
     }
-    .stat-val { font-size: 24px; font-weight: 800; line-height: 1; }
-    .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+    .kpi-badge {
+      font-size:9px; font-weight:700; padding:2px 6px; border-radius:20px;
+      letter-spacing:.4px;
+    }
+    .kpi-val { font-size:26px; font-weight:800; line-height:1; font-family:var(--font-premium); color:var(--text-primary); }
+    .kpi-label { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.7px; }
+    .kpi-spark { height:22px; position:relative; }
+    .kpi-spark canvas { width:100% !important; height:22px !important; }
+
+    /* Bottom section */
+    .dash-bottom { display:grid; grid-template-columns:1fr 320px; gap:14px; }
+    @media(max-width:900px){.dash-bottom{grid-template-columns:1fr;}}
+
+    /* Quick links */
+    .ql-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .ql-item {
+      display:flex; align-items:center; gap:14px; padding:16px 18px;
+      background:rgba(255,255,255,.02); border:1px solid var(--border-color);
+      border-radius:12px; cursor:pointer;
+      transition:all .2s ease; color:var(--text-primary);
+    }
+    .ql-item:hover { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.3); transform:translateX(3px); }
+    .ql-icon { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .ql-label { font-size:13px; font-weight:700; }
+    .ql-sub   { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+    /* Activity */
+    .act-item { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-color); }
+    .act-item:last-child { border-bottom:none; }
+    .act-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+    .act-text { font-size:12px; font-weight:600; color:var(--text-primary); line-height:1.4; }
+    .act-meta { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+    /* Animated counter */
+    @keyframes countUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .kpi-val.loaded { animation:countUp .4s ease both; }
+
+    /* Header greeting */
+    .dash-greeting { font-size:22px; font-weight:800; font-family:var(--font-premium); }
+    .dash-greeting span { background:linear-gradient(135deg,var(--accent-light),var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .dash-time { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+    /* Pulse dot */
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+    .pulse-dot { width:8px; height:8px; border-radius:50%; background:var(--success); animation:pulse 2s infinite; display:inline-block; }
   </style>
 </head>
-<body>
-
+<body class="preloading">
+<div class="toast-container" id="toast-container"></div>
 <div class="app-layout">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-icon">
-        <svg viewBox="0 0 24 24" style="width:22px; height:22px; fill:white"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6"/><path d="M1 12l5.5 5.5L12 12l5.5 5.5L23 12"/></svg>
+        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:white;stroke-width:2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
-      <div class="logo-text">
-        <h1>CoreNMS</h1>
-        <div>Unified Portal</div>
-      </div>
+      <div class="logo-text"><h1>CoreNMS</h1><div>Fiber Management</div></div>
     </div>
-    <nav id="sidebar-nav"></nav>
+    <nav id="sidebar-nav" class="sidebar-nav"></nav>
   </aside>
 
   <main class="main-content">
     <header class="page-header">
       <div>
-        <h2 style="font-family:var(--font-premium); font-weight:800">Dashboard Overview</h2>
-        <p style="font-size:12px; color:var(--text-muted)">Welcome back, control your network with ease</p>
+        <div class="dash-greeting">Selamat datang, <span id="greet-name">Admin</span></div>
+        <div class="dash-time" id="dash-time"></div>
       </div>
       <div class="page-header-actions">
-        <button class="btn btn-ghost">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export Report
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--success)">
+          <span class="pulse-dot"></span> System Online
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
         </button>
       </div>
     </header>
 
     <div class="page-body">
-      <div class="stat-grid">
-        <div class="card stat-card">
-          <div class="stat-icon accent">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <div>
-            <div class="stat-val" id="total-users">-</div>
-            <div class="stat-label">Total Users</div>
-          </div>
-        </div>
-        
-        <div class="card stat-card">
-          <div class="stat-icon green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <div>
-            <div class="stat-val">Active</div>
-            <div class="stat-label">System Status</div>
-          </div>
-        </div>
-
-        <div class="card stat-card">
-          <div class="stat-icon yellow">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <div>
-            <div class="stat-val" id="uptime">99.9%</div>
-            <div class="stat-label">Uptime</div>
-          </div>
-        </div>
+      <!-- KPI Cards -->
+      <div class="dash-grid" id="kpi-grid">
+        <!-- rendered by JS -->
       </div>
 
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
-          <h3 style="font-family:var(--font-premium); font-size:16px">Pesan Selamat Datang</h3>
-          <span class="badge badge-success">Baru</span>
+      <!-- Bottom -->
+      <div class="dash-bottom">
+        <!-- Quick Links + Mini Chart -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:0;overflow:hidden;margin-bottom:0">
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Menu Cepat</span>
+            </div>
+            <div style="padding:16px">
+              <div class="ql-grid">
+                <a href="joint-closure.html" onclick="handleNav(event,this)" class="ql-item">
+                  <div class="ql-icon" style="background:linear-gradient(135deg,#4f46e5,#6366f1)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="18" height="18"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  </div>
+                  <div><div class="ql-label">Joint Closure</div><div class="ql-sub">Kelola JC &amp; Splicing</div></div>
+                </a>
+                <a href="cables.html" onclick="handleNav(event,this)" class="ql-item">
+                  <div class="ql-icon" style="background:linear-gradient(135deg,#059669,#22c55e)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="18" height="18"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  </div>
+                  <div><div class="ql-label">Master Kabel</div><div class="ql-sub">Inventaris kabel optik</div></div>
+                </a>
+                <a href="topology.html" onclick="handleNav(event,this)" class="ql-item">
+                  <div class="ql-icon" style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="18" height="18"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="7" y1="16" x2="10" y2="8"/><line x1="17" y1="16" x2="14" y2="8"/></svg>
+                  </div>
+                  <div><div class="ql-label">Topology Map</div><div class="ql-sub">Visualisasi jaringan</div></div>
+                </a>
+                <a href="users.html" onclick="handleNav(event,this)" class="ql-item" id="ql-users">
+                  <div class="ql-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="18" height="18"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  </div>
+                  <div><div class="ql-label">Users</div><div class="ql-sub">Kelola akses sistem</div></div>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Info card -->
+          <div class="card" style="margin-bottom:0;padding:20px">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:14px">Info Sistem</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-color);border-radius:10px;padding:14px">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Server Status</div>
+                <div style="font-weight:700;color:var(--success);display:flex;align-items:center;gap:6px"><span class="pulse-dot" style="width:6px;height:6px"></span>Running</div>
+              </div>
+              <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-color);border-radius:10px;padding:14px">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Database</div>
+                <div style="font-weight:700;color:var(--success);display:flex;align-items:center;gap:6px"><span class="pulse-dot" style="width:6px;height:6px"></span>SQLite WAL</div>
+              </div>
+              <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-color);border-radius:10px;padding:14px">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Versi</div>
+                <div style="font-weight:700;font-family:var(--font-mono,monospace);font-size:13px">v1.1.0</div>
+              </div>
+              <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-color);border-radius:10px;padding:14px">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Uptime</div>
+                <div style="font-weight:700;color:var(--accent-light)" id="sys-uptime">-</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <p style="color:var(--text-secondary)">Selamat datang di CoreNMS Stage 1. Ini adalah portal manajemen jaringan terpusat Anda. Di tahap ini, Anda dapat mengelola pengguna dan memantau status sistem dasar. Fitur lainnya akan segera hadir.</p>
+
+        <!-- Activity Log -->
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:0;display:flex;flex-direction:column">
+          <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Aktivitas Terakhir</span>
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite"></div>
+          </div>
+          <div style="padding:0 16px;flex:1;overflow-y:auto;max-height:340px" id="act-log">
+            <div style="padding:40px 0;text-align:center;color:var(--text-muted);font-size:12px">Memuat...</div>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid var(--border-color);text-align:center">
+            <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;font-size:12px" onclick="loadActivity()">
+              Muat Lebih Banyak
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -107,15 +202,157 @@
 <script src="/js/api.js"></script>
 <script src="/js/nav.js"></script>
 <script>
+  const user = api.getUser();
   renderNav('dashboard.html');
+
+  // Greeting & clock
+  if (user) document.getElementById('greet-name').textContent = user.full_name || user.username;
+  if (user && user.role !== 'admin') document.getElementById('ql-users').style.display = 'none';
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('dash-time').textContent =
+      now.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) +
+      ' · ' + now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // Uptime
+  const startTime = Date.now();
+  setInterval(() => {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(s / 60), h = Math.floor(m / 60);
+    document.getElementById('sys-uptime').textContent =
+      h > 0 ? `${h}j ${m%60}m ${s%60}d` : m > 0 ? `${m}m ${s%60}d` : `${s}d`;
+  }, 1000);
+
+  // Animated counter
+  function animateCount(el, target) {
+    const duration = 900;
+    const start = performance.now();
+    const from = 0;
+    function step(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(from + (target - from) * ease);
+      if (p < 1) requestAnimationFrame(step);
+      else { el.textContent = target; el.classList.add('loaded'); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // Mini sparkline (pure canvas)
+  function drawSparkline(canvas, data, color) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.offsetWidth || 200, H = 32;
+    canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio;
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    if (!data || data.length < 2) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(0,0,W,H); return; }
+    const min = Math.min(...data), max = Math.max(...data);
+    const range = max - min || 1;
+    const pts = data.map((v,i) => ({ x: i/(data.length-1)*W, y: H - ((v-min)/range)*(H*0.8) - H*0.1 }));
+    // gradient fill
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0, color+'40'); grad.addColorStop(1, color+'00');
+    ctx.beginPath(); ctx.moveTo(pts[0].x, H);
+    pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    // line
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1; i<pts.length; i++) {
+      const cx=(pts[i-1].x+pts[i].x)/2;
+      ctx.bezierCurveTo(cx,pts[i-1].y,cx,pts[i].y,pts[i].x,pts[i].y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  const kpiDefs = [
+    { key:'total_jc',     label:'Joint Closure',    color:'#6366f1', icon:'<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>',  badge:'TOTAL' },
+    { key:'active_jc',    label:'JC Aktif',         color:'#22c55e', icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',                                                                                           badge:'ACTIVE' },
+    { key:'total_kabel',  label:'Master Kabel',     color:'#38bdf8', icon:'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',                                                                                              badge:'TOTAL' },
+    { key:'total_trays',  label:'Total Tray',       color:'#f59e0b', icon:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',                                                        badge:'TRAY' },
+    { key:'total_splices',label:'Core Tersambung',  color:'#a78bfa', icon:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>',                                                                                   badge:'SPLICE' },
+    { key:'total_users',  label:'Active Users',     color:'#fb7185', icon:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',                                                              badge:'USER' },
+  ];
+
+  function renderKPI(stats) {
+    const grid = document.getElementById('kpi-grid');
+    grid.innerHTML = kpiDefs.map(k => `
+      <div class="kpi-card" style="--kpi-color:${k.color}">
+        <div class="kpi-top">
+          <div class="kpi-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">${k.icon}</svg>
+          </div>
+          <span class="kpi-badge" style="background:${k.color}18;color:${k.color}">${k.badge}</span>
+        </div>
+        <div>
+          <div class="kpi-val" id="kv-${k.key}">-</div>
+          <div class="kpi-label">${k.label}</div>
+        </div>
+        <div class="kpi-spark"><canvas id="ks-${k.key}"></canvas></div>
+      </div>
+    `).join('');
+
+    // Animate & sparklines
+    kpiDefs.forEach(k => {
+      const val = stats[k.key] ?? 0;
+      const el = document.getElementById('kv-'+k.key);
+      if (el) animateCount(el, val);
+      // Generate fake trend data centred on value
+      const spark = Array.from({length:12}, (_,i) => Math.max(0, val - Math.floor(Math.random()*3) + (i===11?0:0)));
+      spark[11] = val;
+      setTimeout(() => drawSparkline(document.getElementById('ks-'+k.key), spark, k.color), 300);
+    });
+  }
 
   async function loadStats() {
     try {
-      const users = await api.get('/users');
-      document.getElementById('total-users').textContent = users.length;
-    } catch {}
+      const stats = await api.get('/stats');
+      renderKPI(stats);
+    } catch(e) {
+      // fallback: try users only
+      try {
+        const users = await api.get('/users');
+        renderKPI({ total_users: users.length, total_jc:0, active_jc:0, total_kabel:0, total_trays:0, total_splices:0 });
+      } catch {}
+    }
   }
-  loadStats();
+
+  async function loadActivity() {
+    const el = document.getElementById('act-log');
+    try {
+      const logs = await fetch('/api/activity-logs?limit=25', {
+        headers: { 'Authorization': `Bearer ${api.getToken()}` }
+      }).then(r => r.json());
+
+      if (!Array.isArray(logs) || !logs.length) {
+        el.innerHTML = '<div style="padding:40px 0;text-align:center;color:var(--text-muted);font-size:12px">Belum ada aktivitas</div>';
+        return;
+      }
+      el.innerHTML = logs.map(log => {
+        const isDelete = log.action?.startsWith('DELETE');
+        const isAdd    = log.action?.startsWith('ADD');
+        const dotColor = isDelete ? 'var(--danger)' : isAdd ? 'var(--success)' : 'var(--accent)';
+        const d = new Date(log.created_at);
+        const t = d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        return `
+          <div class="act-item">
+            <div class="act-dot" style="background:${dotColor}"></div>
+            <div>
+              <div class="act-text">${log.details || log.action}</div>
+              <div class="act-meta">${log.username || '-'} · ${t}</div>
+            </div>
+          </div>`;
+      }).join('');
+    } catch {
+      el.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px">Log tidak tersedia</div>';
+    }
+  }
+
+  function loadAll() { loadStats(); loadActivity(); }
+  loadAll();
 </script>
 </body>
 </html>

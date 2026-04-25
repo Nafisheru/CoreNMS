@@ -1,57 +1,110 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Topology Map - CoreNMS</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <script>
-    (function() {
-      const t = localStorage.getItem('core_theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', t);
-      document.documentElement.style.background = (t === 'dark' ? '#0a0e1a' : '#f4f7fe');
-    })();
-  </script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="description" content="Topology Map - CoreNMS">
+<title>Topology Map - CoreNMS</title>
+<link rel="stylesheet" href="/css/style.css">
+<script>(function(){const t=localStorage.getItem('core_theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.background=t==='dark'?'#0d0f18':'#f8fafc';})();</script>
+<style>
+#topo-wrap{position:relative;width:100%;height:calc(100vh - 110px);overflow:hidden;border-radius:14px;border:1px solid var(--border-color);background:var(--bg-card);}
+#topo-canvas{display:block;cursor:grab;width:100%;height:100%;}
+#topo-canvas.dragging{cursor:grabbing;}
+/* dot grid bg */
+#topo-wrap::before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(99,102,241,.18) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0;}
+/* controls */
+#topo-ctrl{position:absolute;top:14px;right:14px;display:flex;flex-direction:column;gap:6px;z-index:10;}
+.topo-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:16px;font-weight:700;}
+.topo-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,.08);}
+/* legend */
+#topo-legend{position:absolute;bottom:14px;left:14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;padding:10px 14px;z-index:10;font-size:11px;}
+.leg-item{display:flex;align-items:center;gap:8px;margin-bottom:4px;color:var(--text-secondary);}
+.leg-item:last-child{margin-bottom:0;}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+/* tooltip */
+#topo-tip{position:absolute;background:var(--bg-card);border:1px solid rgba(99,102,241,.35);border-radius:10px;padding:10px 14px;font-size:12px;pointer-events:none;z-index:20;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:160px;}
+#topo-tip h4{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--accent-light);}
+#topo-tip .tr{display:flex;justify-content:space-between;gap:20px;color:var(--text-secondary);margin-top:3px;}
+#topo-tip .tr span:last-child{color:var(--text-primary);font-weight:600;}
+/* info panel */
+#topo-info{position:absolute;top:14px;left:14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;padding:10px 14px;z-index:10;font-size:11px;color:var(--text-muted);}
+#topo-count{font-weight:700;color:var(--text-primary);}
+/* empty */
+#topo-empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:5;text-align:center;}
+</style>
 </head>
 <body class="preloading">
-
 <div class="app-layout">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 24 24" style="width:22px; height:22px; fill:white"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6"/><path d="M1 12l5.5 5.5L12 12l5.5 5.5L23 12"/></svg>
-      </div>
-      <div class="logo-text">
-        <h1>CoreNMS</h1>
-        <div>Unified Portal</div>
-      </div>
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" width="20" height="20"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div class="logo-text"><h1>CoreNMS</h1><div>Fiber Management</div></div>
     </div>
-    <nav id="sidebar-nav"></nav>
+    <nav id="sidebar-nav" class="sidebar-nav"></nav>
   </aside>
 
   <main class="main-content">
     <header class="page-header">
       <div>
-        <h2 style="font-family:var(--font-premium); font-weight:800">Topology Map</h2>
-        <p style="font-size:12px; color:var(--text-muted)">Visual representation of your network structure</p>
+        <h2 style="font-family:var(--font-premium);font-weight:800">Topology Map</h2>
+        <p style="font-size:12px;color:var(--text-muted)">Visualisasi jaringan serat optik — klik node untuk detail</p>
       </div>
       <div class="page-header-actions">
-        <button class="btn btn-ghost">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
-          Recenter Map
+        <button class="btn btn-ghost btn-sm" onclick="loadTopology()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="recenter()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+          Recenter
         </button>
       </div>
     </header>
 
-    <div class="page-body">
-      <div class="card" style="height:calc(100vh - 180px); display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); overflow:hidden; position:relative">
-        <div style="position:absolute; inset:0; background-image:radial-gradient(var(--border-color) 1px, transparent 1px); background-size:32px 32px; opacity:0.3"></div>
-        <div style="text-align:center; position:relative; z-index:10">
-          <div class="logo-icon" style="width:80px; height:80px; margin:0 auto 24px; opacity:0.5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="7" y1="16" x2="10" y2="8"/><line x1="17" y1="16" x2="14" y2="8"/></svg>
+    <div class="page-body" style="padding:14px;height:calc(100vh - 64px);box-sizing:border-box">
+      <div id="topo-wrap">
+        <canvas id="topo-canvas"></canvas>
+
+        <div id="topo-info">
+          Nodes: <span id="topo-count">—</span>
+        </div>
+
+        <div id="topo-ctrl">
+          <button class="topo-btn" onclick="zoom(1.2)" title="Zoom In">+</button>
+          <button class="topo-btn" onclick="zoom(0.8)" title="Zoom Out">−</button>
+          <button class="topo-btn" onclick="recenter()" title="Fit All" style="font-size:12px">⊙</button>
+        </div>
+
+        <div id="topo-legend">
+          <div class="leg-item"><div class="leg-dot" style="background:#6366f1"></div>Joint Closure</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>JC Aktif</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div>Maintenance</div>
+          <div class="leg-item"><div class="leg-dot" style="background:rgba(148,163,184,.5)"></div>Koneksi Kabel</div>
+        </div>
+
+        <div id="topo-tip">
+          <h4 id="tip-name"></h4>
+          <div class="tr"><span>Status</span><span id="tip-status"></span></div>
+          <div class="tr"><span>Lokasi</span><span id="tip-lokasi"></span></div>
+          <div class="tr"><span>Kabel</span><span id="tip-kabel"></span></div>
+          <div class="tr"><span>Tray</span><span id="tip-tray"></span></div>
+          <div class="tr"><span>Splices</span><span id="tip-splice"></span></div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color)">
+            <a id="tip-link" href="#" onclick="openJC(event)" style="color:var(--accent-light);font-weight:700;font-size:11px">
+              Buka Detail →
+            </a>
           </div>
-          <h3 style="font-family:var(--font-premium); color:var(--text-primary); margin-bottom:12px; font-size:20px">Map Under Construction</h3>
-          <p style="max-width:400px; color:var(--text-secondary)">We are building a powerful fiber-optic topology visualizer. This feature will be available in Stage 2 of development.</p>
+        </div>
+
+        <div id="topo-empty">
+          <div style="width:64px;height:64px;border-radius:16px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;border:1px solid rgba(99,102,241,.2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5" width="32" height="32"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="7" y1="16" x2="10" y2="8"/><line x1="17" y1="16" x2="14" y2="8"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">Belum ada data Joint Closure</div>
+            <div style="font-size:12px;color:var(--text-muted)">Tambahkan JC dan hubungkan kabel untuk melihat topologi</div>
+          </div>
+          <a href="joint-closure.html" class="btn btn-primary btn-sm">Buka Joint Closure</a>
         </div>
       </div>
     </div>
@@ -61,7 +114,370 @@
 <script src="/js/api.js"></script>
 <script src="/js/nav.js"></script>
 <script>
-  renderNav('topology.html');
+renderNav('topology.html');
+
+// ── Canvas & state ──────────────────────────────────────────────
+const canvas = document.getElementById('topo-canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('topo-wrap');
+const tip    = document.getElementById('topo-tip');
+
+let nodes = [], edges = [];
+let pan = {x:0, y:0}, scale = 1;
+let dragging = false, lastMouse = {x:0,y:0};
+let hoveredNode = null, selectedId = null;
+let animFrame = null, simRunning = false;
+
+// ── Resize canvas ──────────────────────────────────────────────
+function resizeCanvas() {
+  canvas.width  = wrap.clientWidth  * devicePixelRatio;
+  canvas.height = wrap.clientHeight * devicePixelRatio;
+  canvas.style.width  = wrap.clientWidth  + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── Load data ──────────────────────────────────────────────────
+async function loadTopology() {
+  document.getElementById('topo-count').textContent = '…';
+  try {
+    const jcs = await api.get('/joint-closure');
+    if (!jcs.length) { document.getElementById('topo-empty').style.display = 'flex'; return; }
+    document.getElementById('topo-empty').style.display = 'none';
+
+    // Build nodes
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    const cx = W/2, cy = H/2, r = Math.min(W,H)*0.32;
+
+    nodes = jcs.map((jc, i) => {
+      const angle = (i / jcs.length) * Math.PI * 2 - Math.PI/2;
+      // Use saved coords if exist, else circular layout
+      let nx = cx + Math.cos(angle)*r;
+      let ny = cy + Math.sin(angle)*r;
+      if (jcs.length === 1) { nx=cx; ny=cy; }
+      return {
+        id: jc.id, label: jc.kode_jc, lokasi: jc.lokasi||'—',
+        status: jc.status_jc||'active',
+        cable_count: jc.cable_count||0, tray_count: jc.tray_count||0,
+        splice_count: 0,
+        x: nx, y: ny, vx: 0, vy: 0,
+        r: 24 + Math.min(jc.cable_count||0, 4)*3
+      };
+    });
+
+    // Build edges from shared cables (cable_id appears in 2 JCs)
+    edges = [];
+    const cableMap = {};
+    jcs.forEach(jc => {
+      (jc.cables||[]).forEach(c => {
+        if (!cableMap[c.kabel_id]) cableMap[c.kabel_id] = [];
+        cableMap[c.kabel_id].push(jc.id);
+      });
+    });
+    Object.values(cableMap).forEach(ids => {
+      for (let a=0; a<ids.length-1; a++)
+        for (let b=a+1; b<ids.length; b++)
+          if (!edges.find(e => (e.a===ids[a]&&e.b===ids[b])||(e.a===ids[b]&&e.b===ids[a])))
+            edges.push({a:ids[a], b:ids[b]});
+    });
+
+    // Fetch splice counts
+    await Promise.all(nodes.map(async n => {
+      try {
+        const d = await api.get(`/joint-closure/${n.id}`);
+        n.splice_count = (d.trays||[]).reduce((s,t)=>s+(t.splice_count||0),0);
+        n.tray_count   = (d.trays||[]).length;
+        n.cable_count  = (d.cables||[]).length;
+      } catch{}
+    }));
+
+    document.getElementById('topo-count').textContent = `${nodes.length} JC, ${edges.length} link`;
+
+    // Run force simulation
+    runSimulation();
+    recenter();
+  } catch(e) {
+    document.getElementById('topo-count').textContent = 'Error';
+    console.error(e);
+  }
+}
+
+// ── Force-directed layout ──────────────────────────────────────
+function runSimulation() {
+  simRunning = true;
+  let iter = 0;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  function tick() {
+    if (iter++ > 300) { simRunning = false; return; }
+    const k = Math.sqrt((W*H) / Math.max(nodes.length,1)) * 0.7;
+
+    // Repulsion
+    for (let i=0; i<nodes.length; i++) {
+      nodes[i].fx = 0; nodes[i].fy = 0;
+      for (let j=0; j<nodes.length; j++) {
+        if (i===j) continue;
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const d  = Math.sqrt(dx*dx+dy*dy) || 1;
+        const f  = (k*k) / d;
+        nodes[i].fx += (dx/d)*f;
+        nodes[i].fy += (dy/d)*f;
+      }
+    }
+    // Attraction
+    edges.forEach(e => {
+      const a = nodes.find(n=>n.id===e.a), b = nodes.find(n=>n.id===e.b);
+      if (!a||!b) return;
+      const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1;
+      const f=(d*d)/k;
+      a.fx+=(dx/d)*f; a.fy+=(dy/d)*f;
+      b.fx-=(dx/d)*f; b.fy-=(dy/d)*f;
+    });
+    // Gravity to centre
+    nodes.forEach(n => {
+      n.fx += (W/2-n.x)*0.015;
+      n.fy += (H/2-n.y)*0.015;
+    });
+    // Apply
+    const temp = Math.max(3, 40*(1-iter/300));
+    nodes.forEach(n => {
+      if (n.pinned) return;
+      const d = Math.sqrt(n.fx*n.fx+n.fy*n.fy)||1;
+      n.x += (n.fx/d)*Math.min(d,temp);
+      n.y += (n.fy/d)*Math.min(d,temp);
+    });
+    draw();
+    if (iter < 300) requestAnimationFrame(tick);
+    else { simRunning = false; }
+  }
+  tick();
+}
+
+// ── Drawing ────────────────────────────────────────────────────
+const STATUS_COLOR = { active:'#22c55e', maintenance:'#f59e0b', inactive:'#ef4444' };
+
+function draw() {
+  const dpr = devicePixelRatio;
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.scale(dpr, dpr);
+  ctx.translate(pan.x, pan.y);
+  ctx.scale(scale, scale);
+
+  // Edges
+  edges.forEach(e => {
+    const a = nodes.find(n=>n.id===e.a), b = nodes.find(n=>n.id===e.b);
+    if (!a||!b) return;
+    const isHov = hoveredNode && (hoveredNode.id===e.a || hoveredNode.id===e.b);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    // curved line
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2 - 20;
+    ctx.quadraticCurveTo(mx,my,b.x,b.y);
+    ctx.strokeStyle = isHov ? 'rgba(99,102,241,.7)' : 'rgba(148,163,184,.22)';
+    ctx.lineWidth   = isHov ? 2 : 1.5;
+    if (!isHov) { ctx.setLineDash([5,4]); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Edge label (cable count)
+    if (isHov) {
+      ctx.fillStyle='rgba(99,102,241,.9)';
+      ctx.font='bold 10px Inter,sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('kabel', mx, my-4);
+    }
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const isHov = hoveredNode && hoveredNode.id===n.id;
+    const isSel = selectedId === n.id;
+    const color = STATUS_COLOR[n.status] || '#6366f1';
+    const nr    = n.r + (isHov ? 4 : 0);
+
+    // Glow
+    if (isHov || isSel) {
+      const g = ctx.createRadialGradient(n.x,n.y,nr*0.4,n.x,n.y,nr*2.2);
+      g.addColorStop(0, color+'55');
+      g.addColorStop(1, color+'00');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, nr*2.2, 0, Math.PI*2);
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, nr+4, 0, Math.PI*2);
+    ctx.fillStyle = color+'22';
+    ctx.fill();
+    ctx.strokeStyle = color+(isSel?'ff':'66');
+    ctx.lineWidth = isSel ? 2 : 1;
+    ctx.stroke();
+
+    // Node circle
+    const grad = ctx.createRadialGradient(n.x-nr*0.3, n.y-nr*0.3, 0, n.x, n.y, nr);
+    grad.addColorStop(0, color+'cc');
+    grad.addColorStop(1, color+'88');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, nr, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(9, 11/scale)}px Inter,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Abbreviate if too long
+    const lbl = n.label.length > 10 ? n.label.slice(0,10)+'…' : n.label;
+    ctx.fillText(lbl, n.x, n.y);
+
+    // Sub-label below
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = `${Math.max(8, 9/scale)}px Inter,sans-serif`;
+    ctx.fillText(`${n.cable_count}kbl · ${n.tray_count}tr`, n.x, n.y + nr + 13/scale);
+  });
+
+  ctx.restore();
+}
+
+// ── Tooltip ────────────────────────────────────────────────────
+function showTip(n, mx, my) {
+  document.getElementById('tip-name').textContent   = n.label;
+  document.getElementById('tip-status').textContent = n.status;
+  document.getElementById('tip-status').style.color = STATUS_COLOR[n.status]||'#fff';
+  document.getElementById('tip-lokasi').textContent = n.lokasi || '—';
+  document.getElementById('tip-kabel').textContent  = n.cable_count + ' kabel';
+  document.getElementById('tip-tray').textContent   = n.tray_count  + ' tray';
+  document.getElementById('tip-splice').textContent = n.splice_count + ' core';
+  document.getElementById('tip-link').dataset.id    = n.id;
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  tip.style.display = 'block';
+  let tx = mx+14, ty = my-10;
+  if (tx + 180 > ww) tx = mx - 194;
+  if (ty + 160 > wh) ty = wh - 170;
+  tip.style.left = tx+'px';
+  tip.style.top  = ty+'px';
+}
+function hideTip() { tip.style.display='none'; }
+
+function openJC(e) {
+  e.preventDefault();
+  const id = e.currentTarget.dataset.id;
+  if (id) window.location.href = `jc-detail.html?id=${id}`;
+}
+
+// ── Hit test ──────────────────────────────────────────────────
+function worldPos(ex, ey) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (ex - rect.left - pan.x) / scale;
+  const my = (ey - rect.top  - pan.y) / scale;
+  return {x:mx, y:my};
+}
+function hitNode(wx, wy) {
+  for (let i=nodes.length-1; i>=0; i--) {
+    const n=nodes[i], dx=wx-n.x, dy=wy-n.y;
+    if (Math.sqrt(dx*dx+dy*dy) <= n.r+4) return n;
+  }
+  return null;
+}
+
+// ── Pan & zoom ─────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  const w = worldPos(e.clientX, e.clientY);
+  const hit = hitNode(w.x, w.y);
+  if (hit) {
+    selectedId = hit.id;
+    draw();
+    return;
+  }
+  selectedId = null;
+  dragging = true;
+  lastMouse = {x:e.clientX, y:e.clientY};
+  canvas.classList.add('dragging');
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    pan.x += e.clientX - lastMouse.x;
+    pan.y += e.clientY - lastMouse.y;
+    lastMouse = {x:e.clientX, y:e.clientY};
+    draw(); return;
+  }
+  const w   = worldPos(e.clientX, e.clientY);
+  const hit = hitNode(w.x, w.y);
+  if (hit !== hoveredNode) {
+    hoveredNode = hit;
+    draw();
+  }
+  if (hit) {
+    const rect = canvas.getBoundingClientRect();
+    showTip(hit, e.clientX - rect.left, e.clientY - rect.top);
+  } else { hideTip(); }
+});
+
+canvas.addEventListener('mouseup', () => { dragging=false; canvas.classList.remove('dragging'); });
+canvas.addEventListener('mouseleave', () => { dragging=false; hoveredNode=null; hideTip(); draw(); });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  pan.x = mx - (mx - pan.x)*factor;
+  pan.y = my - (my - pan.y)*factor;
+  scale = Math.min(Math.max(scale*factor, 0.15), 4);
+  draw();
+}, {passive:false});
+
+// Touch support
+let lastDist = null;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length===1) { lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY}; dragging=true; }
+  if (e.touches.length===2) { lastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); dragging=false; }
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length===1&&dragging) {
+    pan.x+=e.touches[0].clientX-lastMouse.x; pan.y+=e.touches[0].clientY-lastMouse.y;
+    lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY}; draw();
+  }
+  if (e.touches.length===2&&lastDist) {
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const f=d/lastDist; scale=Math.min(Math.max(scale*f,0.15),4); lastDist=d; draw();
+  }
+},{passive:false});
+canvas.addEventListener('touchend',()=>{dragging=false;lastDist=null;});
+
+// ── Controls ──────────────────────────────────────────────────
+function zoom(f) {
+  const cx=wrap.clientWidth/2, cy=wrap.clientHeight/2;
+  pan.x=cx-(cx-pan.x)*f; pan.y=cy-(cy-pan.y)*f;
+  scale=Math.min(Math.max(scale*f,0.15),4); draw();
+}
+
+function recenter() {
+  if (!nodes.length) return;
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  nodes.forEach(n=>{minX=Math.min(minX,n.x-n.r);maxX=Math.max(maxX,n.x+n.r);minY=Math.min(minY,n.y-n.r);maxY=Math.max(maxY,n.y+n.r);});
+  const gW=maxX-minX||1, gH=maxY-minY||1;
+  scale=Math.min((W-80)/gW,(H-80)/gH,2);
+  pan.x=(W-(minX+maxX)*scale)/2;
+  pan.y=(H-(minY+maxY)*scale)/2;
+  draw();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+resizeCanvas();
+loadTopology();
 </script>
 </body>
 </html>
